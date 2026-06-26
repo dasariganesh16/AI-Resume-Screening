@@ -4,7 +4,7 @@ services:
     env: python
     branch: master
     buildCommand: pip install -r requirements.txt
-    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --app-dir backend
     envVars:
       - key: FRONTEND_URL
         value: https://<your-vercel-domain>.vercel.app
