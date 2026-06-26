@@ -12,7 +12,14 @@ from app.api.v1.routes.report import router as report_router
 load_dotenv()
 
 frontend_url = os.getenv('FRONTEND_URL')
-allowed_origins = [frontend_url] if frontend_url else ['*']
+frontend_urls = os.getenv('FRONTEND_URLS')
+
+if frontend_urls:
+    allowed_origins = [url.strip() for url in frontend_urls.split(',') if url.strip()]
+elif frontend_url:
+    allowed_origins = [frontend_url.strip()]
+else:
+    allowed_origins = ['*']
 
 app = FastAPI(
     title="Resume Screening AI API",
