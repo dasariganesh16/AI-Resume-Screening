@@ -20,8 +20,20 @@ def get_embedding_client():
 
     if not api_key:
         raise ValueError("No Gemini API key configured for embeddings.")
+    # Configure module-level client as some versions of the SDK expose
+    # embeddings via the module (genai.embeddings) while others expose
+    # them on the returned Client instance. Configure both to be safe.
+    try:
+        genai.configure(api_key=api_key)
+    except Exception:
+        # If configure is not available, ignore and rely on Client below
+        pass
 
-    return genai.Client(api_key=api_key)
+    try:
+        return genai.Client(api_key=api_key)
+    except Exception:
+        # Fall back to returning None when Client isn't supported by SDK
+        return None
 
 
 def cosine_similarity(a, b):
@@ -41,10 +53,22 @@ def calculate_embedding_similarity(
 ):
     client = get_embedding_client()
 
-    response = client.embeddings.create(
-        model="textembedding-gecko-001",
-        input=[resume_text, jd_text]
-    )
+    # Support different genai SDK shapes: prefer client.embeddings but
+    # fall back to module-level genai.embeddings.create when available.
+    if client is not None and hasattr(client, "embeddings"):
+        response = client.embeddings.create(
+            model="textembedding-gecko-001",
+            input=[resume_text, jd_text]
+        )
+    elif hasattr(genai, "embeddings"):
+        response = genai.embeddings.create(
+            model="textembedding-gecko-001",
+            input=[resume_text, jd_text]
+        )
+    else:
+        raise RuntimeError(
+            "GenAI embeddings API is not available in the installed google-genai SDK."
+        )
 
     resume_embedding = response.data[0].embedding
     jd_embedding = response.data[1].embedding
