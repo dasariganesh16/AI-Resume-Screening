@@ -11,14 +11,19 @@ from app.api.v1.routes.report import router as report_router
 
 load_dotenv()
 
-frontend_url = os.getenv('FRONTEND_URL')
-frontend_urls = os.getenv('FRONTEND_URLS')
+frontend_url = os.getenv('FRONTEND_URL', '').strip()
+frontend_urls = os.getenv('FRONTEND_URLS', '')
 
+def _is_real_url(url: str) -> bool:
+    return bool(url and '<your-vercel-domain>' not in url and '<' not in url and '>' not in url)
+
+allowed_origins = []
 if frontend_urls:
-    allowed_origins = [url.strip() for url in frontend_urls.split(',') if url.strip()]
-elif frontend_url:
-    allowed_origins = [frontend_url.strip()]
-else:
+    allowed_origins = [url.strip() for url in frontend_urls.split(',') if _is_real_url(url.strip())]
+elif _is_real_url(frontend_url):
+    allowed_origins = [frontend_url]
+
+if not allowed_origins:
     allowed_origins = ['*']
 
 app = FastAPI(
