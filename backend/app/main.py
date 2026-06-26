@@ -23,21 +23,26 @@ if frontend_urls:
 elif _is_real_url(frontend_url):
     allowed_origins = [frontend_url]
 
+use_origin_regex = False
 if not allowed_origins:
     allowed_origins = ['*']
+    use_origin_regex = True
 
 app = FastAPI(
     title="Resume Screening AI API",
     version="1.0.0"
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_kwargs = {
+    "allow_origins": allowed_origins,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+if use_origin_regex:
+    cors_kwargs["allow_origin_regex"] = ".*"
+
+app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(api_analyze_router, prefix="/api/v1")

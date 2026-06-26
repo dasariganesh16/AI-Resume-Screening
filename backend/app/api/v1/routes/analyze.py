@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.schemas.analysis import AnalysisResponse
@@ -36,6 +38,7 @@ async def analyze_resume(
         ) from exc
 
     except Exception as exc:
+        logging.exception("Resume analysis failed")
         raise HTTPException(
             status_code=500,
             detail="Resume analysis failed."
