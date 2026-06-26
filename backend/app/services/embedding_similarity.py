@@ -1,55 +1,54 @@
 from functools import lru_cache
+import math
+import os
 
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
+from dotenv import load_dotenv
+from google import genai
 
 
 @lru_cache(maxsize=1)
-def get_embedding_model():
-    return SentenceTransformer(
-        "all-MiniLM-L6-v2"
+def get_embedding_client():
+    load_dotenv()
+
+    api_key = (
+        os.getenv("GEMINI_API_KEY_EMBEDDING")
+        or os.getenv("GEMINI_API_KEY")
+        or os.getenv("GEMINI_API_KEY_ADVISOR")
+        or os.getenv("GEMINI_API_KEY_INTERVIEW")
+        or os.getenv("GEMINI_API_KEY_TAILOR")
     )
+
+    if not api_key:
+        raise ValueError("No Gemini API key configured for embeddings.")
+
+    return genai.Client(api_key=api_key)
+
+
+def cosine_similarity(a, b):
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(y * y for y in b))
+
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+
+    return dot / (norm_a * norm_b)
+
 
 def calculate_embedding_similarity(
     resume_text,
     jd_text
 ):
-    model = get_embedding_model()
+    client = get_embedding_client()
 
-    resume_embedding = model.encode(
-        resume_text
+    response = client.embeddings.create(
+        model="textembedding-gecko-001",
+        input=[resume_text, jd_text]
     )
 
-    jd_embedding = model.encode(
-        jd_text
-    )
+    resume_embedding = response.data[0].embedding
+    jd_embedding = response.data[1].embedding
 
-    similarity = cosine_similarity(
-        [resume_embedding],
-        [jd_embedding]
-    )[0][0]
+    similarity = cosine_similarity(resume_embedding, jd_embedding)
 
-    return float(round(float(similarity) * 100, 2))
-
-
-
-if __name__ == "__main__":
-
-    resume = """
-    Experienced Machine Learning Engineer
-    with Python, SQL, Deep Learning
-    and NLP experience.
-    """
-
-    jd = """
-    Looking for a Machine Learning Engineer
-    with Python, SQL, Deep Learning
-    and NLP skills.
-    """
-
-    score = calculate_embedding_similarity(
-        resume,
-        jd
-    )
-
-    print(score)
+    return float(round(similarity * 100, 2))
