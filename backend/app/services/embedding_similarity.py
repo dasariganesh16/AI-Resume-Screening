@@ -1,78 +1,35 @@
-from functools import lru_cache
-import math
-import os
-
-from dotenv import load_dotenv
-from google import genai
+from sklearn.feature_extraction.text import TfidfVectorizer
+import numpy as np
 
 
-@lru_cache(maxsize=1)
-def get_embedding_client():
-    load_dotenv()
+def calculate_embedding_similarity(resume_text, jd_text):
+    """Compute similarity between resume and job description using TF-IDF + cosine."""
 
-    api_key = (
-        os.getenv("GEMINI_API_KEY_EMBEDDING")
-        or os.getenv("GEMINI_API_KEY")
-        or os.getenv("GEMINI_API_KEY_ADVISOR")
-        or os.getenv("GEMINI_API_KEY_INTERVIEW")
-        or os.getenv("GEMINI_API_KEY_TAILOR")
-    )
-
-    if not api_key:
-        raise ValueError("No Gemini API key configured for embeddings.")
-    # Configure module-level client as some versions of the SDK expose
-    # embeddings via the module (genai.embeddings) while others expose
-    # them on the returned Client instance. Configure both to be safe.
-    try:
-        genai.configure(api_key=api_key)
-    except Exception:
-        # If configure is not available, ignore and rely on Client below
-        pass
+    resume_text = (resume_text or "").strip()
+    jd_text = (jd_text or "").strip()
 
     try:
-        return genai.Client(api_key=api_key)
+        vectorizer = TfidfVectorizer()
+
+        tfidf = vectorizer.fit_transform([
+            resume_text,
+            jd_text
+        ])
+
+        resume_vector = tfidf[0].toarray()[0]
+        jd_vector = tfidf[1].toarray()[0]
+
     except Exception:
-        # Fall back to returning None when Client isn't supported by SDK
-        return None
-
-
-def cosine_similarity(a, b):
-    dot = sum(x * y for x, y in zip(a, b))
-    norm_a = math.sqrt(sum(x * x for x in a))
-    norm_b = math.sqrt(sum(y * y for y in b))
-
-    if norm_a == 0 or norm_b == 0:
         return 0.0
 
-    return dot / (norm_a * norm_b)
+    dot = np.dot(resume_vector, jd_vector)
 
+    norm_resume = np.linalg.norm(resume_vector)
+    norm_jd = np.linalg.norm(jd_vector)
 
-def calculate_embedding_similarity(
-    resume_text,
-    jd_text
-):
-    client = get_embedding_client()
+    if norm_resume == 0 or norm_jd == 0:
+        return 0.0
 
-    # Support different genai SDK shapes: prefer client.embeddings but
-    # fall back to module-level genai.embeddings.create when available.
-    if client is not None and hasattr(client, "embeddings"):
-        response = client.embeddings.create(
-            model="textembedding-gecko-001",
-            input=[resume_text, jd_text]
-        )
-    elif hasattr(genai, "embeddings"):
-        response = genai.embeddings.create(
-            model="textembedding-gecko-001",
-            input=[resume_text, jd_text]
-        )
-    else:
-        raise RuntimeError(
-            "GenAI embeddings API is not available in the installed google-genai SDK."
-        )
+    similarity = dot / (norm_resume * norm_jd)
 
-    resume_embedding = response.data[0].embedding
-    jd_embedding = response.data[1].embedding
-
-    similarity = cosine_similarity(resume_embedding, jd_embedding)
-
-    return float(round(similarity * 100, 2))
+    return round(float(similarity * 100), 2)
